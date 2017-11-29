@@ -9,8 +9,8 @@ type Message interface {
 
 type StringMsg string
 
-func (sm StringMsg) Serialize() []byte {
-	return []byte(sm)
+func (sm *StringMsg) Serialize() []byte {
+	return []byte(*sm)
 }
 
 func (sm *StringMsg) Deserialize(bt []byte) {
