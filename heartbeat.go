@@ -22,12 +22,8 @@ func init() {
 func heartbeat(conns map[int64]*ConnAction)  {
 	for{
 		for k,v:= range conns  {
-			logger.Println("conn id :",k)
-			if (*v).GetTimeout()==0{
-				(*v).PullMessage(func() int64 {
-
-				},)
-			}
+			logger.Println("conn id :",k,"timeout...")
+			(*v).Timeout()
 		}
 	}
 }

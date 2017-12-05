@@ -1,50 +1,54 @@
 package pod
 
 import (
-	"math"
 	"encoding/binary"
 	"bytes"
+	"io"
+	"time"
 )
 
-//消息
+//可读写消息
 type Message interface {
 	//序列化
-	Serialize() []byte
+	Serialize(writer io.Writer)
 	//反序列化
-	Deserialize([]byte)
+	Deserialize(reader io.Reader)
 }
 
-type BaseMessage struct {
+type heatbeatMsg struct {
 	MsgType int64
 	Length int64
-	Data []byte
+	Duration time.Duration
+	//data io.ReadWriter
 }
 
-func (sm *BaseMessage) Serialize() []byte {
-	b := make([]byte,sm.Length)
-	b_buf := bytes.NewBuffer(b[0:8])
-	binary.Read(b_buf, binary.BigEndian, sm.MsgType)
-	b_buf2 := bytes.NewBuffer(b[8:16])
-	binary.Read(b_buf2, binary.BigEndian, sm.Length)
-	b[16:sm.Length]=sm.Data
-	return b
+func (h *heatbeatMsg)Serialize(writer io.Writer) {
+	bt:=make([]byte,8)
+
+	b_buf:=bytes.NewBuffer(bt)
+	binary.Write(b_buf,binary.BigEndian,h.MsgType)
+	writer.Write(b_buf.Bytes())
+
+	b_buf=bytes.NewBuffer(bt)
+	binary.Write(b_buf,binary.BigEndian,h.Length)
+	writer.Write(b_buf.Bytes())
+
+	b_buf=bytes.NewBuffer(bt)
+	binary.Write(b_buf,binary.BigEndian,h.Duration)
+	writer.Write(b_buf.Bytes())
 }
 
-func (sm *BaseMessage) Deserialize(bt []byte) {
-	*sm =  BaseMessage{
+func (h *heatbeatMsg)Deserialize(reader io.Reader){
+	bt:=make([]byte,8)
+	reader.Read(bt)
+	b_buf:=bytes.NewBuffer(bt)
+	binary.Read(b_buf,binary.BigEndian,h.MsgType)
 
-	}
-}
+	reader.Read(bt)
+	b_buf=bytes.NewBuffer(bt)
+	binary.Read(b_buf,binary.BigEndian,h.Length)
 
-
-type  HeartbeatMessage struct {
-
-}
-
-func (sm *HeartbeatMessage) Serialize() []byte {
-	return []byte(*sm)
-}
-
-func (sm *HeartbeatMessage) Deserialize(bt []byte) {
-	*sm = StringMsg(bt)
+	reader.Read(bt)
+	b_buf=bytes.NewBuffer(bt)
+	binary.Read(b_buf,binary.BigEndian,h.Duration)
 }

@@ -8,6 +8,20 @@ import (
 	"time"
 )
 
+//链接动作
+type ConnAction interface {
+	//发送消息
+	PushMessage(message *Message)
+	//获取消息
+	PullMessage(message *Message) *Message
+	//取消
+	Cancel()
+	//超时
+	Timeout()
+	//关闭
+	Close()
+}
+
 //生命周期
 type Lifecycle struct {
 	//1、链接建立 :
@@ -73,6 +87,11 @@ func (bc *BaseConn)GetTimeout() time.Duration{
 func (bc *BaseConn) Start(conn net.Conn){
 	bc.buReader=bufio.NewReader(conn)
 	bc.buWriter=bufio.NewWriter(conn)
+	if bc.OnActiveTimeout !=nil{
+		ctx,cancel:=context.WithTimeout(context.Background(),time.Second*bc.activeTimeout)
+		defer  cancel()
+		bc.OnActiveTimeout(ctx,conn)
+	}
 }
 //发送消息
 func (bc *BaseConn) PushMessage(message *Message){
@@ -80,28 +99,40 @@ func (bc *BaseConn) PushMessage(message *Message){
 	defer bc.mux.Unlock()
 	bc.OnWriteStar(context.TODO(),bc.conn)
 	//写入数据
-	bc.buWriter.Write((*message).Serialize())
+	(*message).Serialize(bc.buWriter)
 	bc.OnWriteEnd(context.TODO(),bc.conn)
 }
 //获取消息
 //len 字节数
 //message 消息实例
-func (bc *BaseConn)PullMessage(len func()int64,message *Message) *Message{
+func (bc *BaseConn)PullMessage(message *Message) *Message{
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 	bc.OnReadStart(context.TODO(),bc.conn)
-	b:=make([]byte,len())
-	bc.buReader.Read(b)
-	(*message).Deserialize(b)
+	(*message).Deserialize(bc.buReader)
 	bc.OnReadEnd(context.TODO(),bc.conn)
 	return message
 }
 //取消
 func (bc *BaseConn)Cancel(){
-
+	if bc.OnTransferCancel != nil{
+		ctx,cancel:=context.WithCancel(context.Background())
+		defer cancel()
+		bc.OnTransferCancel(ctx,bc.conn)
+	}
 }
+
 //关闭
 func (bc *BaseConn)Close(){
-
+	if bc.OnConnClose != nil{
+		ctx,cancel:=context.WithCancel(context.Background())
+		defer cancel()
+		bc.OnConnClose(ctx,bc.conn)
+	}
 }
 
+func (bc *BaseConn)Timeout(){
+	if bc.OnActiveTimeout !=nil {
+		bc.OnActiveTimeout(context.Background(),bc.conn)
+	}
+}
