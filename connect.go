@@ -11,9 +11,9 @@ import (
 //链接动作
 type ConnAction interface {
 	//发送消息
-	PushMessage(message *Message)
+	PushMessage(message Message)
 	//获取消息
-	PullMessage(message *Message) *Message
+	PullMessage(message Message) Message
 	//取消
 	Cancel()
 	//超时
@@ -49,7 +49,7 @@ type Lifecycle struct {
 	//2.响应超时 :
 	OnResponseTimeout func(ctx context.Context, conn net.Conn)
 	//3.未活动超时 :
-	OnActiveTimeout func(ctx context.Context, conn net.Conn)
+	OnActiveTimeout func(ctx context.Context, conn ConnAction)
 }
 
 //基本连接
@@ -90,26 +90,26 @@ func (bc *BaseConn) Start(conn net.Conn){
 	if bc.OnActiveTimeout !=nil{
 		ctx,cancel:=context.WithTimeout(context.Background(),time.Second*bc.activeTimeout)
 		defer  cancel()
-		bc.OnActiveTimeout(ctx,conn)
+		go	bc.OnActiveTimeout(ctx,bc)
 	}
 }
 //发送消息
-func (bc *BaseConn) PushMessage(message *Message){
+func (bc *BaseConn) PushMessage(message Message){
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 	bc.OnWriteStar(context.TODO(),bc.conn)
 	//写入数据
-	(*message).Serialize(bc.buWriter)
+	message.Serialize(bc.buWriter)
 	bc.OnWriteEnd(context.TODO(),bc.conn)
 }
 //获取消息
 //len 字节数
 //message 消息实例
-func (bc *BaseConn)PullMessage(message *Message) *Message{
+func (bc *BaseConn)PullMessage(message Message) Message{
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
 	bc.OnReadStart(context.TODO(),bc.conn)
-	(*message).Deserialize(bc.buReader)
+	message.Deserialize(bc.buReader)
 	bc.OnReadEnd(context.TODO(),bc.conn)
 	return message
 }
@@ -133,6 +133,6 @@ func (bc *BaseConn)Close(){
 
 func (bc *BaseConn)Timeout(){
 	if bc.OnActiveTimeout !=nil {
-		bc.OnActiveTimeout(context.Background(),bc.conn)
+		bc.OnActiveTimeout(context.Background(),bc)
 	}
 }

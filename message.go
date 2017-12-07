@@ -22,6 +22,10 @@ type heatbeatMsg struct {
 	//data io.ReadWriter
 }
 
+func  NewHeatbeatMsg() heatbeatMsg  {
+	return heatbeatMsg{MsgType:1,Length:24,Duration:30*time.Second}
+}
+
 func (h *heatbeatMsg)Serialize(writer io.Writer) {
 	bt:=make([]byte,8)
 
