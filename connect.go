@@ -1,10 +1,10 @@
 package pod
 
 import (
-	"net"
-	"context"
-	"sync"
 	"bufio"
+	"context"
+	"net"
+	"sync"
 	"time"
 )
 
@@ -27,7 +27,7 @@ type Lifecycle struct {
 	//1、链接建立 :
 	OnConnected func(ctx context.Context, conn net.Conn)
 	//2、链接关闭 :
-	OnConnClose func(ctx context.Context, conn net.Conn) ()
+	OnConnClose func(ctx context.Context, conn net.Conn)
 	//3、链接错误：
 	OnError func(ctx context.Context, conn net.Conn)
 	//7.取消数据传输 :
@@ -54,8 +54,8 @@ type Lifecycle struct {
 
 //基本连接
 type BaseConn struct {
-	connid int64
-	conn net.Conn
+	connid   int64
+	conn     net.Conn
 	buReader *bufio.Reader
 	buWriter *bufio.Writer
 	//同步锁
@@ -68,71 +68,82 @@ type BaseConn struct {
 	//3.未活动超时 :
 	activeTimeout time.Duration
 }
+
 //设置链接超时时间
-func (bc *BaseConn)SetConnTimeout(connTimeout time.Duration){
-	bc.connTimeout=connTimeout
+func (bc *BaseConn) SetConnTimeout(connTimeout time.Duration) {
+	bc.connTimeout = connTimeout
 }
+
 //设置相应超时时间
-func (bc *BaseConn)SetResponseTimeout(responseTimeout time.Duration){
-	bc.responseTimeout=responseTimeout
+func (bc *BaseConn) SetResponseTimeout(responseTimeout time.Duration) {
+	bc.responseTimeout = responseTimeout
 }
+
 //设置活动超时时间
-func (bc *BaseConn)SetActiveTimeout(activeTimeout time.Duration){
-	bc.activeTimeout=activeTimeout
+func (bc *BaseConn) SetActiveTimeout(activeTimeout time.Duration) {
+	bc.activeTimeout = activeTimeout
 }
-func (bc *BaseConn)GetTimeout() time.Duration{
-	return  bc.activeTimeout
+func (bc *BaseConn) GetTimeout() time.Duration {
+	return bc.activeTimeout
 }
+
 //启动
-func (bc *BaseConn) Start(conn net.Conn){
-	bc.buReader=bufio.NewReader(conn)
-	bc.buWriter=bufio.NewWriter(conn)
-	if bc.OnActiveTimeout !=nil{
-		ctx,cancel:=context.WithTimeout(context.Background(),time.Second*bc.activeTimeout)
-		defer  cancel()
-		go	bc.OnActiveTimeout(ctx,bc)
-	}
+func (bc *BaseConn) Start(conn net.Conn) {
+	bc.buReader = bufio.NewReader(conn)
+	bc.buWriter = bufio.NewWriter(conn)
 }
+
 //发送消息
-func (bc *BaseConn) PushMessage(message Message){
+func (bc *BaseConn) PushMessage(message Message) {
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
-	bc.OnWriteStar(context.TODO(),bc.conn)
+	if bc.OnWriteStar != nil {
+		bc.OnWriteStar(context.TODO(), bc.conn)
+	}
 	//写入数据
 	message.Serialize(bc.buWriter)
-	bc.OnWriteEnd(context.TODO(),bc.conn)
+	if bc.OnWriteEnd != nil {
+		bc.OnWriteEnd(context.TODO(), bc.conn)
+	}
+
 }
+
 //获取消息
 //len 字节数
 //message 消息实例
-func (bc *BaseConn)PullMessage(message Message) Message{
+func (bc *BaseConn) PullMessage(message Message) Message {
 	bc.mux.Lock()
 	defer bc.mux.Unlock()
-	bc.OnReadStart(context.TODO(),bc.conn)
+	if bc.OnReadStart != nil {
+		bc.OnReadStart(context.TODO(), bc.conn)
+	}
 	message.Deserialize(bc.buReader)
-	bc.OnReadEnd(context.TODO(),bc.conn)
+	if bc.OnReadEnd != nil {
+		bc.OnReadEnd(context.TODO(), bc.conn)
+	}
 	return message
 }
+
 //取消
-func (bc *BaseConn)Cancel(){
-	if bc.OnTransferCancel != nil{
-		ctx,cancel:=context.WithCancel(context.Background())
+func (bc *BaseConn) Cancel() {
+	if bc.OnTransferCancel != nil {
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		bc.OnTransferCancel(ctx,bc.conn)
+		bc.OnTransferCancel(ctx, bc.conn)
 	}
 }
 
 //关闭
-func (bc *BaseConn)Close(){
-	if bc.OnConnClose != nil{
-		ctx,cancel:=context.WithCancel(context.Background())
+func (bc *BaseConn) Close() {
+	if bc.OnConnClose != nil {
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		bc.OnConnClose(ctx,bc.conn)
+		bc.OnConnClose(ctx, bc.conn)
 	}
 }
 
-func (bc *BaseConn)Timeout(){
-	if bc.OnActiveTimeout !=nil {
-		bc.OnActiveTimeout(context.Background(),bc)
+func (bc *BaseConn) Timeout() {
+	if bc.OnActiveTimeout != nil {
+		bc.OnActiveTimeout(context.Background(), bc)
 	}
 }

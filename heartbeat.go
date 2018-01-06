@@ -15,14 +15,14 @@ func AddConn(nid int64, ca *ConnAction) {
 
 func init() {
 	conns = make(map[int64]*ConnAction)
-	logger=log.New(os.Stdout,"heartbeat",log.LstdFlags|log.Llongfile)
+	logger = log.New(os.Stdout, "heartbeat", log.LstdFlags|log.Llongfile)
 	go heartbeat(conns)
 }
 
-func heartbeat(conns map[int64]*ConnAction)  {
-	for{
-		for k,v:= range conns  {
-			logger.Println("conn id :",k,"timeout...")
+func heartbeat(conns map[int64]*ConnAction) {
+	for {
+		for k, v := range conns {
+			logger.Println("conn id :", k, "timeout...")
 			(*v).Timeout()
 		}
 	}
