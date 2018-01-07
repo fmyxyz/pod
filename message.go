@@ -5,31 +5,33 @@ import (
 	"encoding/binary"
 	"io"
 	"time"
+	"errors"
+	"fmt"
 )
 
 //信息类型
 type MsgType = byte
 
-func (mt MsgType) String() string {
-	switch mt {
-	case HEATBEAT:
-		return "HEATBEAT"
-	case BINARY:
-		return "BINARY"
-	case BIGBINARY:
-		return "BIGBINARY"
-	case TEXT:
-		return "TEXT"
-	case BIGTEXT:
-		return "BIGTEXT"
-	case MORETEXT:
-		return "MORETEXT"
-	case MOREBINARY:
-		return "MOREBINARY"
-	default:
-		return "Unknow"
-	}
-}
+//func (mt MsgType) String() string {
+//	switch mt {
+//	case HEATBEAT:
+//		return "HEATBEAT"
+//	case BINARY:
+//		return "BINARY"
+//	case BIGBINARY:
+//		return "BIGBINARY"
+//	case TEXT:
+//		return "TEXT"
+//	case BIGTEXT:
+//		return "BIGTEXT"
+//	case MORETEXT:
+//		return "MORETEXT"
+//	case MOREBINARY:
+//		return "MOREBINARY"
+//	default:
+//		return "Unknow"
+//	}
+//}
 
 const (
 	_ MsgType = iota
@@ -64,10 +66,10 @@ type Message interface {
 	Serialize(writer io.Writer) error
 	//反序列化 具体不包括 元数据
 	Deserialize(reader io.Reader) error
-	//消息类型
-	MessageType() MsgType
-	//字节长度
-	Size() int64
+	//获取消息类型
+	GetMetadata() Metadata
+	//设置消息类型
+	SetMetadata(md Metadata)
 }
 
 //消息元数据
@@ -76,20 +78,23 @@ type Metadata struct {
 	Length  int64
 }
 
-func (h Metadata) Size() int64 {
-	return h.Length
+func (h Metadata) GetMetadata() Metadata {
+	return h
 }
 
-func (h Metadata) MessageType() MsgType {
-	return h.MsgType
+func (h *Metadata) SetMetadata(md Metadata) {
+	h.Length = md.Length
+	h.MsgType = md.MsgType
 }
 
 func (h *Metadata) Serialize(writer io.Writer) error {
 	var err error
 	bs := make([]byte, METADATALENGTH)
 	bs[0] = h.MsgType
-	b_buf := bytes.NewBuffer(bs[1:METADATALENGTH])
+	b_buf := bytes.NewBuffer([]byte{})
 	binary.Write(b_buf, binary.BigEndian, h.Length)
+	lbs := b_buf.Bytes(); //h.Length 二进制数据
+	copy(bs[1:METADATALENGTH], lbs)
 	_, err = writer.Write(bs)
 	if err != nil {
 		return err
@@ -99,9 +104,10 @@ func (h *Metadata) Serialize(writer io.Writer) error {
 
 func (h *Metadata) Deserialize(reader io.Reader) error {
 	var err error
+	var l int
 	bt := make([]byte, METADATALENGTH)
-	_, err = reader.Read(bt)
-	if err != nil {
+	l, err = reader.Read(bt)
+	if err != nil || l != METADATALENGTH {
 		return err
 	}
 	h.MsgType = MsgType(bt[0])
@@ -110,46 +116,68 @@ func (h *Metadata) Deserialize(reader io.Reader) error {
 	return err
 }
 
-
 // 注册消息
 type RegistryedMessage struct {
-	registryedMessage map [MsgType] Message
-	metadata Metadata
+	registryedMessage map[MsgType]Message
+	metadata          Metadata
 }
 
-func (h RegistryedMessage) Size() int64 {
-	return h.registryedMessage[h.metadata.MsgType].Size()
+func RegistryMessage(mt MsgType, msg Message) *RegistryedMessage {
+	rm := new(RegistryedMessage)
+	rm.registryedMessage = make(map[MsgType]Message)
+	rm.registryedMessage[mt] = msg
+	return rm
 }
 
-func (h RegistryedMessage) MessageType() MsgType {
-	return  h.metadata.MsgType
+func (rm *RegistryedMessage) RegistryMessage(mt MsgType, msg Message) *RegistryedMessage {
+	rm.registryedMessage[mt] = msg
+	return rm
+}
+
+func (h *RegistryedMessage) SetMetadata(md Metadata) {
+	h.metadata = md
+}
+
+func (h RegistryedMessage) GetMetadata() Metadata {
+	return h.metadata
 }
 
 func (h *RegistryedMessage) Serialize(writer io.Writer) error {
 	var err error
-	msg:= h.registryedMessage[h.metadata.MsgType]
-	err=msg.Serialize(writer)
+	msg := h.registryedMessage[h.metadata.MsgType]
+	//设置元数据
+	msg.SetMetadata(h.metadata)
+	err = msg.Serialize(writer)
 	return err
 }
 
 func (h *RegistryedMessage) Deserialize(reader io.Reader) error {
 	var err error
-	msg:= h.registryedMessage[h.metadata.MsgType]
-	err=msg.Deserialize(reader)
+	msg := h.registryedMessage[h.metadata.MsgType]
+	if msg == nil {
+		return errors.New(fmt.Sprint("未注册：", h.metadata.MsgType))
+	}
+	//设置元数据
+	msg.SetMetadata(h.metadata)
+	err = msg.Deserialize(reader)
 	return err
 }
-
-
 
 // 一系列消息
 type MessageQueue []Message
 
-func (h MessageQueue) Size() int64 {
-	return -1
+func (h MessageQueue) GetMetadata() Metadata {
+	for _, v := range h {
+		return v.GetMetadata()
+	}
+	var md Metadata
+	return md
 }
 
-func (h MessageQueue) MessageType() MsgType {
-	return SEQUENCE
+func (h *MessageQueue) SetMetadata(md Metadata) {
+	for _, v := range *h {
+		v.SetMetadata(md)
+	}
 }
 
 func (h *MessageQueue) Serialize(writer io.Writer) error {
@@ -178,7 +206,6 @@ func (h *MessageQueue) Deserialize(reader io.Reader) error {
 type HeatbeatMsg struct {
 	Metadata
 	Duration time.Duration
-	//data io.ReadWriter
 }
 
 //默认30s
@@ -186,27 +213,27 @@ func NewHeatbeatMsg() HeatbeatMsg {
 	return HeatbeatMsg{Duration: 30 * time.Second}
 }
 
-func (h HeatbeatMsg) Size() int64 {
-	return h.Length
+func (h *HeatbeatMsg) SetMetadata(md Metadata) {
+	h.Metadata = md
 }
 
-func (h HeatbeatMsg) MessageType() MsgType {
-	return h.MsgType
+func (h HeatbeatMsg) GetMetadata() Metadata {
+	return h.Metadata
 }
 
 func (h *HeatbeatMsg) Serialize(writer io.Writer) error {
 	var err error
 	//消息长度为8字节
-	h.Length=8
-	h.MsgType=HEATBEAT
+	h.Length = 8
+	h.MsgType = HEATBEAT
 	err = h.Metadata.Serialize(writer)
 	if err != nil {
 		return err
 	}
-	bt := make([]byte, 8)
-	b_buf := bytes.NewBuffer(bt)
+	b_buf := bytes.NewBuffer([]byte{})
 	binary.Write(b_buf, binary.BigEndian, h.Duration)
-	_, err = writer.Write(b_buf.Bytes())
+	bt := b_buf.Bytes()
+	_, err = writer.Write(bt)
 	return err
 }
 
@@ -214,7 +241,7 @@ func (h *HeatbeatMsg) Deserialize(reader io.Reader) error {
 	var err error
 	bt := make([]byte, 8)
 	b_buf := bytes.NewBuffer(bt)
-	err = binary.Read(b_buf, binary.BigEndian, &h.Duration)
 	_, err = reader.Read(bt)
+	err = binary.Read(b_buf, binary.BigEndian, &h.Duration)
 	return err
 }

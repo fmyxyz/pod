@@ -1,30 +1,19 @@
-package demo
+package main
 
 import (
-	"context"
+	"encoding/binary"
+	"bytes"
 	"fmt"
-	"github.com/fmyxyz/pod"
-	"net"
 )
 
 func main() {
-	conn, e := net.Dial("tcp", "127.0.0.1:12321")
-	if e != nil {
-		cc := NewDomeClinetConn(conn)
-		cc.Start(conn)
-	}
-}
+	b_buf := bytes.NewBuffer([]byte{})
+	var i int64 = 0xffffaa88
+	binary.Write(b_buf, binary.BigEndian, i)
+	fmt.Println(b_buf.Bytes())
+	var b=b_buf.Bytes()
+	b2 := []byte{8: 0}
+	a :=copy(b2[1:9], b)
+	fmt.Println(b2,a)
 
-func NewDomeClinetConn(conn net.Conn) *pod.ClientConn {
-	cc := pod.NewClientConn(0)
-	cc.OnReadStart = func(ctx context.Context, conn net.Conn) {
-		b := make([]byte, 10, 10)
-		conn.Read(b)
-		fmt.Println(b)
-	}
-	cc.OnConnected = func(ctx context.Context, conn net.Conn) {
-		fmt.Println("I am in...")
-		conn.Write([]byte("I am in..."))
-	}
-	return cc
 }

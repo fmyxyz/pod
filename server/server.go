@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/fmyxyz/pod"
+	//"github.com/fmyxyz/pod"
 	"github.com/fmyxyz/pod/utils"
 	"log"
 	"net"
+	"github.com/fmyxyz/pod"
 )
 
 func main() {
@@ -26,31 +27,35 @@ func handleConn(conn net.Conn) {
 	log.Println("新的连接：", conn.RemoteAddr())
 	netid := utils.GenerationId()
 	log.Println("netid:", netid)
+	//心跳信息
+	hitmsg := pod.NewHeatbeatMsg()
+	//注册
+	regMsg := pod.RegistryMessage(pod.HEATBEAT, &hitmsg)
 
-	//sc := pod.NewServerConn(netid)
-	//sc.Start(conn)
 	var a int
 	for {
 		a++
+		//b:=make([]byte,17)
+		//i,err:=conn.Read(b)
+		//log.Println(b,i)
 		msg := pod.Metadata{}
 		err := msg.Deserialize(conn)
 		if err != nil {
 			log.Println("接收数据错误：", err)
 			return
 		}
+		//设置获取的元数据
+		regMsg.SetMetadata(msg)
+		err = regMsg.Deserialize(conn)
 
-		//注册一系列解码器
-		for ; ;  {
-			
+		if err != nil {
+			log.Println("接收数据错误：", err)
+			return
 		}
 
-
-
-		log.Println("收到数据：", a, msg)
-
-		/*		sc.PullMessage(&msg)
-				log.Println("接收心跳信息：", msg)
-				sc.PushMessage(&msg)
-				log.Println("发送心跳信息：", msg)*/
+		//sc.PullMessage(&msg)
+		//log.Println("接收心跳信息：", msg)
+		//sc.PushMessage(&msg)
+		//log.Println("发送心跳信息：", msg)
 	}
 }

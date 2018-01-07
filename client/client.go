@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/fmyxyz/pod"
 	"github.com/fmyxyz/pod/utils"
-	"log"
+	//"log"
 	"net"
 	"time"
 )
@@ -20,9 +20,12 @@ func main() {
 	msg := pod.NewHeatbeatMsg()
 	msg.MsgType = 1
 	msg.Duration = 3 * time.Second
-	for i := 0; i < 100; i++ {
-		msg.Serialize(conn)
-		log.Println("发送完成消息：", msg)
+	for i := 0; i < 10; i++ {
+		err:=	msg.Serialize(conn)
+		if err!=nil{
+			return
+		}
+		//log.Println("发送完成消息：", msg)
 		//cc.PushMessage(&msg)
 		//log.Println("发送消息：", msg)
 		//cc.PullMessage(&msg)
