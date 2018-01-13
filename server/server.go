@@ -32,6 +32,11 @@ func handleConn(conn net.Conn) {
 	//注册
 	regMsg := pod.RegistryMessage(pod.HEATBEAT, &hitmsg)
 
+	//二进制信息
+	binmsg := pod.NewBinaryMsg()
+	//注册
+	regMsg.RegistryMessage(pod.BINARY, &binmsg)
+
 	var a int
 	for {
 		a++
@@ -44,6 +49,7 @@ func handleConn(conn net.Conn) {
 			log.Println("接收数据错误：", err)
 			return
 		}
+		log.Println("接收数据类型：", msg)
 		//设置获取的元数据
 		regMsg.SetMetadata(msg)
 		err = regMsg.Deserialize(conn)

@@ -2,10 +2,11 @@ package main
 
 import (
 	"github.com/fmyxyz/pod"
-	"github.com/fmyxyz/pod/utils"
+	//"github.com/fmyxyz/pod/utils"
 	//"log"
 	"net"
-	"time"
+	"fmt"
+	"log"
 )
 
 func main() {
@@ -14,18 +15,26 @@ func main() {
 		return
 	}
 	defer conn.Close()
-	netid := utils.GenerationId()
-	var cc = pod.NewClientConn(netid)
-	cc.Start(conn)
+	//netid := utils.GenerationId()
+	//var cc = pod.NewClientConn(netid)
+	//cc.Start(conn)
 	msg := pod.NewHeatbeatMsg()
-	msg.MsgType = 1
-	msg.Duration = 3 * time.Second
+
+	bmsg := pod.NewBinaryMsg()
+
+	textmsg := pod.NewTextMsg()
 	for i := 0; i < 10; i++ {
-		err:=	msg.Serialize(conn)
-		if err!=nil{
+		err := msg.Serialize(conn)
+		if err != nil {
 			return
 		}
-		//log.Println("发送完成消息：", msg)
+
+		bmsg.Data = []byte(fmt.Sprintln("BinaryMsg:", i))
+		bmsg.Serialize(conn)
+		log.Println("发送完成消息：",bmsg)
+
+		textmsg.Data=fmt.Sprintln("text 数据：", i)
+		textmsg.Serialize(conn)
 		//cc.PushMessage(&msg)
 		//log.Println("发送消息：", msg)
 		//cc.PullMessage(&msg)
